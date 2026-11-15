@@ -165,7 +165,8 @@ The three released checkpoints are included under `logs/`:
 
 ## Contact
 
-Shihao Zhang: `zshihao@gs.zzu.edu.cn`
+If you have any questions, please contact Shihao Zhang at
+`zshihao@gs.zzu.edu.cn`.
 
 ## Acknowledgements
 
