@@ -1,4 +1,4 @@
-# SFDANet: A Spatial-Frequency Decoupled Attention Network for Infrared Small Target Detection [[Weights](./logs/README.md)]
+# SFDANet: A Spatial-Frequency Decoupled Attention Network for Infrared Small Target Detection
 
 #### ShiHao Zhang, Xin He, Shuai Yuan, Shaohui Jin, Xiaoheng Jiang, Yang Lu, and Mingliang Xu
 
@@ -11,63 +11,43 @@
 ## Repository Structure
 
 ```text
-SFDANet开源/
-├── assets/
-│   └── fig2_architecture.png
-├── datasets/
-│   ├── NUAA-SIRST/
-│   │   ├── images/
-│   │   │   ├── Misc_1.png
-│   │   │   ├── Misc_2.png
-│   │   │   └── ...
-│   │   ├── masks/
-│   │   │   ├── Misc_1.png
-│   │   │   ├── Misc_2.png
-│   │   │   └── ...
-│   │   └── img_idx/
-│   │       ├── train_NUAA-SIRST.txt
-│   │       └── test_NUAA-SIRST.txt
-│   ├── NUDT-SIRST/
-│   │   ├── images/
-│   │   │   ├── 000001.png
-│   │   │   ├── 000002.png
-│   │   │   └── ...
-│   │   ├── masks/
-│   │   │   ├── 000001.png
-│   │   │   ├── 000002.png
-│   │   │   └── ...
-│   │   └── img_idx/
-│   │       ├── train_NUDT-SIRST.txt
-│   │       └── test_NUDT-SIRST.txt
-│   └── IRSTD-1K/
-│       ├── images/
-│       │   ├── XDU0.png
-│       │   ├── XDU1.png
-│       │   └── ...
-│       ├── masks/
-│       │   ├── XDU0.png
-│       │   ├── XDU1.png
-│       │   └── ...
-│       └── img_idx/
-│           ├── train_IRSTD-1K.txt
-│           └── test_IRSTD-1K.txt
-├── logs/
-│   ├── NUAA-SIRST/
-│   │   └── SFDANet_BCE_softIoU_0.1_1.0_best_miou.pth.tar
-│   ├── NUDT-SIRST/
-│   │   └── SFDANet_BCE_softIoU_0.1_1.0_best_miou.pth.tar
-│   └── IRSTD-1K/
-│       └── SFDANet_BCE_softIoU_0.1_1.0_best_miou.pth.tar
-├── model/
-│   ├── __init__.py
-│   └── SFDANet.py
-├── dataset.py
-├── loss.py
-├── metrics.py
-├── net.py
-├── train.py
-├── test.py
-└── utils.py
+datasets/
+├── NUAA-SIRST/
+│   ├── images/
+│   │   ├── Misc_1.png
+│   │   ├── Misc_2.png
+│   │   └── ...
+│   ├── masks/
+│   │   ├── Misc_1.png
+│   │   ├── Misc_2.png
+│   │   └── ...
+│   └── img_idx/
+│       ├── train_NUAA-SIRST.txt
+│       └── test_NUAA-SIRST.txt
+├── NUDT-SIRST/
+│   ├── images/
+│   │   ├── 000001.png
+│   │   ├── 000002.png
+│   │   └── ...
+│   ├── masks/
+│   │   ├── 000001.png
+│   │   ├── 000002.png
+│   │   └── ...
+│   └── img_idx/
+│       ├── train_NUDT-SIRST.txt
+│       └── test_NUDT-SIRST.txt
+└── IRSTD-1K/
+    ├── images/
+    │   ├── XDU0.png
+    │   ├── XDU1.png
+    │   └── ...
+    ├── masks/
+    │   ├── XDU0.png
+    │   ├── XDU1.png
+    │   └── ...
+    └── img_idx/
+        ├── train_IRSTD-1K.txt
+        └── test_IRSTD-1K.txt
 ```
 
 ## Introduction
@@ -107,9 +87,6 @@ public datasets and place them under `datasets/` following the
 - **IRSTD-1K**:
   [download](https://github.com/RuiZhang97/ISNet)
 
-The repository keeps only the lightweight `img_idx` split files. The
-`images/` and `masks/` directories are empty placeholders.
-
 ### 2. Environment
 
 ```bash
@@ -140,11 +117,6 @@ python train.py \
   --softIoU_weight 1
 ```
 
-The loss weights use their actual meanings:
-
-- `--BCE_weight`: weight of the BCE term.
-- `--softIoU_weight`: weight of the Soft-IoU term.
-
 ### 4. Test
 
 ```bash
@@ -155,9 +127,8 @@ python test.py \
   --test_size 512
 ```
 
-Use `--test_size 0` to evaluate at the original image resolution. For
-the manuscript protocol on NUAA-SIRST/NUDT-SIRST, use `--test_size 256`.
-For IRSTD-1K, use `--test_size 512`.
+For NUAA-SIRST and NUDT-SIRST, use `--test_size 256`. For IRSTD-1K,
+use `--test_size 512`.
 
 ## Results and Trained Models
 
@@ -177,9 +148,6 @@ The three released checkpoints are included under `logs/`:
 | NUDT-SIRST | `logs/NUDT-SIRST/SFDANet_BCE_softIoU_0.1_1.0_best_miou.pth.tar` |
 | IRSTD-1K | `logs/IRSTD-1K/SFDANet_BCE_softIoU_0.1_1.0_best_miou.pth.tar` |
 
-Each checkpoint is about 31.12 MiB. This is below GitHub's 100 MiB
-per-file limit, so no Git LFS is required.
-
 ## Citation
 
 ```bibtex
@@ -193,8 +161,8 @@ per-file limit, so no Git LFS is required.
 
 ## Contact
 
-Please raise an issue for code questions, or contact
-[Shihao Zhang](mailto:zshihao@gs.zzu.edu.cn).
+Please raise an issue for code questions, or contact Shihao Zhang at
+zshihao@gs.zzu.edu.cn.
 
 ## Acknowledgements
 

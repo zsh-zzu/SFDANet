@@ -37,21 +37,20 @@ class SigmoidMetric():
         output = output.detach().numpy()
         target = target.detach().numpy()
 
-        predict = (output > 0).astype('int64')  # P
-        pixel_labeled = np.sum(target > 0)  # T
-        pixel_correct = np.sum((predict == target) * (target > 0))  # TP
+        predict = (output > 0).astype('int64')
+        pixel_labeled = np.sum(target > 0)
+        pixel_correct = np.sum((predict == target) * (target > 0))
         assert pixel_correct <= pixel_labeled
         return pixel_correct, pixel_labeled
 
     def batch_intersection_union(self, output, target):
         mini = 1
-        maxi = 1  # nclass
-        nbins = 1  # nclass
-        predict = (output.detach().numpy() > 0).astype('int64')  # P
-        target = target.numpy().astype('int64')  # T
-        intersection = predict * (predict == target)  # TP
+        maxi = 1
+        nbins = 1
+        predict = (output.detach().numpy() > 0).astype('int64')
+        target = target.numpy().astype('int64')
+        intersection = predict * (predict == target)
 
-        # areas of intersection and union
         area_inter, _ = np.histogram(intersection, bins=nbins, range=(mini, maxi))
         area_pred, _ = np.histogram(predict, bins=nbins, range=(mini, maxi))
         area_lab, _ = np.histogram(target, bins=nbins, range=(mini, maxi))
@@ -88,15 +87,13 @@ class SamplewiseSigmoidMetric():
 
     def batch_intersection_union(self, output, target, nclass, score_thresh):
         """mIoU"""
-        # inputs are tensor
-        # the category 0 is ignored class, typically for background / boundary
         mini = 1
-        maxi = 1  # nclass
-        nbins = 1  # nclass
+        maxi = 1
+        nbins = 1
 
-        predict = (torch.sigmoid(output).detach().numpy() > score_thresh).astype('int64')  # P
-        target = target.detach().numpy().astype('int64')  # T
-        intersection = predict * (predict == target)  # TP
+        predict = (torch.sigmoid(output).detach().numpy() > score_thresh).astype('int64')
+        target = target.detach().numpy().astype('int64')
+        intersection = predict * (predict == target)
 
         num_sample = intersection.shape[0]
         area_inter_arr = np.zeros(num_sample)
@@ -105,7 +102,6 @@ class SamplewiseSigmoidMetric():
         area_union_arr = np.zeros(num_sample)
 
         for b in range(num_sample):
-            # areas of intersection and union
             area_inter, _ = np.histogram(intersection[b], bins=nbins, range=(mini, maxi))
             area_inter_arr[b] = area_inter
 
@@ -121,49 +117,6 @@ class SamplewiseSigmoidMetric():
             assert (area_inter <= area_union).all()
 
         return area_inter_arr, area_union_arr
-
-
-'''
-class ROCMetric():
-    def __init__(self, nclass, bins):
-        self.nclass = nclass
-        self.bins = bins
-        self.tp_arr = np.zeros(self.bins+1)
-        self.pos_arr = np.zeros(self.bins+1)
-        self.fp_arr = np.zeros(self.bins+1)
-        self.neg_arr = np.zeros(self.bins+1)
-
-    def update(self, preds, labels):
-        for iBin in range(self.bins+1):
-            score_thresh = (iBin + 0.0) / self.bins
-            i_tp, i_pos, i_fp, i_neg = self.cal_tp_pos_fp_neg(preds, labels, self.nclass, score_thresh)
-
-            self.tp_arr[iBin] += i_tp
-            self.pos_arr[iBin] += i_pos
-            self.fp_arr[iBin] += i_fp
-            self.neg_arr[iBin] += i_neg
-
-    def get(self):
-        tp_rates = self.tp_arr / (self.pos_arr + 0.001)
-        fp_rates = self.fp_arr / (self.neg_arr + 0.001)
-
-        return tp_rates, fp_rates
-
-    def cal_tp_pos_fp_neg(output, target, nclass, score_thresh):
-        mini = 1
-        maxi = 1 # nclass
-        nbins = 1 # nclass
-
-        predict = (torch.sigmoid(output).detach().numpy() > score_thresh).astype('int64') # P
-        target = target.detach().numpy().astype('int64')  # T
-        intersection = predict * (predict == target) # TP
-        tp = intersection.sum()
-        fp = (predict * (predict != target)).sum()  # FP
-        tn = ((1 - predict) * (predict == target)).sum()  # TN
-        fn = ((predict != target) * (1 - predict)).sum()   # FN
-        pos = tp + fn
-        neg = fp + tn
-        return tp, pos, fp, neg'''
 
 import numpy as np
 import torch.nn as nn
@@ -200,7 +153,7 @@ class ROCMetric():
     """Computes pixAcc and mIoU metric scores
     """
 
-    def __init__(self, nclass, bins):  # bin的意义实际上是确定ROC曲线上的threshold取多少个离散值
+    def __init__(self, nclass, bins):
         super(ROCMetric, self).__init__()
         self.nclass = nclass
         self.bins = bins
@@ -209,12 +162,10 @@ class ROCMetric():
         self.fp_arr = np.zeros(self.bins + 1)
         self.neg_arr = np.zeros(self.bins + 1)
         self.class_pos = np.zeros(self.bins + 1)
-        # self.reset()
 
     def update(self, preds, labels):
         for iBin in range(self.bins + 1):
             score_thresh = (iBin + 0.0) / self.bins
-            # print(iBin, "-th, score_thresh: ", score_thresh)
             i_tp, i_pos, i_fp, i_neg, i_class_pos = cal_tp_pos_fp_neg(preds, labels, self.nclass, score_thresh)
             self.tp_arr[iBin] += i_tp
             self.pos_arr[iBin] += i_pos
@@ -257,17 +208,17 @@ class PD_FA():
             score_thresh = iBin * (255 / self.bins)
             predits = np.array((preds > score_thresh).cpu()).astype('int64')
             if W == 512:
-                predits = np.reshape(predits, (512, 512))  # 512
-                labelss = np.array((labels).cpu()).astype('int64')  # P
-                labelss = np.reshape(labelss, (512, 512))  # 512
+                predits = np.reshape(predits, (512, 512))
+                labelss = np.array((labels).cpu()).astype('int64')
+                labelss = np.reshape(labelss, (512, 512))
             elif W == 384:
-                predits = np.reshape(predits, (384, 384))  # 512
-                labelss = np.array((labels).cpu()).astype('int64')  # P
-                labelss = np.reshape(labelss, (384, 384))  # 512
+                predits = np.reshape(predits, (384, 384))
+                labelss = np.array((labels).cpu()).astype('int64')
+                labelss = np.reshape(labelss, (384, 384))
             else:
-                predits = np.reshape(predits, (512 // 2, 512 // 2))  # 512
-                labelss = np.array((labels).cpu()).astype('int64')  # P
-                labelss = np.reshape(labelss, (512 // 2, 512 // 2))  # 512
+                predits = np.reshape(predits, (512 // 2, 512 // 2))
+                labelss = np.array((labels).cpu()).astype('int64')
+                labelss = np.reshape(labelss, (512 // 2, 512 // 2))
 
             image = measure.label(predits, connectivity=2)
             coord_image = measure.regionprops(image)
@@ -300,11 +251,10 @@ class PD_FA():
             self.dismatch = [x for x in self.image_area_total if x not in self.image_area_match]
             self.FA[iBin] += np.sum(self.dismatch)
             self.PD[iBin] += len(self.distance_match)
-        # print(len(self.image_area_total))
 
     def get(self, img_num):
 
-        Final_FA = self.FA / ((512 * 512) * img_num)  # 512
+        Final_FA = self.FA / ((512 * 512) * img_num)
         Final_PD = self.PD / self.target
 
         return Final_FA, Final_PD
@@ -322,7 +272,6 @@ class mIoU():
         self.reset()
 
     def update(self, preds, labels):
-        # print('come_ininin')
 
         correct, labeled = batch_pix_accuracy(preds, labels)
         inter, union = batch_intersection_union(preds, labels, self.nclass)
@@ -480,8 +429,8 @@ class PD_FA_sc():
         label = measure.label(labelss, connectivity=2)
         coord_label = measure.regionprops(label)
 
-        self.target += len(coord_label)   # 目标总数  直接就搞GT的连通域个数
-        self.image_area_total = []   # 图像中预测的区域列表
+        self.target += len(coord_label)
+        self.image_area_total = []
         self.image_area_match = []
         self.distance_match = []
         self.dismatch = []
@@ -490,7 +439,7 @@ class PD_FA_sc():
             area_image = np.array(coord_image[K].area)
             self.image_area_total.append(area_image)
 
-        for i in range(len(coord_label)):   # image 与 label 之间 根据中心点 进行连通域的确定
+        for i in range(len(coord_label)):
             centroid_label = np.array(list(coord_label[i].centroid))
             for m in range(len(coord_image)):
                 centroid_image = np.array(list(coord_image[m].centroid))
@@ -500,13 +449,13 @@ class PD_FA_sc():
                     self.distance_match.append(distance)
                     self.image_area_match.append(area_image)
 
-                    del coord_image[m]   # 匹配上一个之后就 清除一个
+                    del coord_image[m]
                     break
 
-        self.dismatch = [x for x in self.image_area_total if x not in self.image_area_match] # 在image里面 但是不在label里面
-        self.dismatch_pixel += np.sum(self.dismatch)  # Fa 虚警
+        self.dismatch = [x for x in self.image_area_total if x not in self.image_area_match]
+        self.dismatch_pixel += np.sum(self.dismatch)
         self.all_pixel += size[0] * size[1]
-        self.PD += len(self.distance_match)  # 如果中心点之间距离在3一下 就算Pd  所以Pd 是匹配上了的目标的个数
+        self.PD += len(self.distance_match)
 
     def get(self):
         Final_FA = self.dismatch_pixel / self.all_pixel

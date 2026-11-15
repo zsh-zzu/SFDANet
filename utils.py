@@ -115,8 +115,6 @@ def get_img_norm_cfg(dataset_name, dataset_dir):
         img_norm_cfg = dict(mean=107.80905151367188, std=33.02274703979492)
     elif dataset_name == 'IRSTD-1K':
         img_norm_cfg = dict(mean=87.4661865234375, std=39.71953201293945)
-    # elif dataset_name == 'IRSTD-Air':
-    #     img_norm_cfg = dict(mean=126.81832885742188, std=63.84687042236328)
     elif dataset_name == 'NUDT-SIRST-Sea':
         img_norm_cfg = dict(mean=43.62403869628906, std=18.91838264465332)
     elif dataset_name == 'SIRST4':
@@ -160,8 +158,6 @@ def get_optimizer(net, optimizer_name, scheduler_name, optimizer_settings, sched
     if scheduler_name != 'CosineAnnealingLR':
         raise ValueError("Adam_FW2 must be used with CosineAnnealingLR")
 
-    # Adam_FW2 is kept as the command-line name used by the original training
-    # recipe. Its optimization updates are Adam, with cosine learning-rate decay.
     optimizer = torch.optim.Adam(
         net.parameters(),
         lr=optimizer_settings['lr'],

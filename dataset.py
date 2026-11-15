@@ -67,7 +67,6 @@ class TestSetLoader(Dataset):
             mask = Image.open((self.dataset_dir + '/masks/' + self.test_list[idx] + '.bmp').replace('//','/'))
         if mask.size != img.size:
             mask = mask.resize(img.size, Image.Resampling.NEAREST)
-        # print(self.dataset_dir + '/images/' + self.test_list[idx] + '.png')
         img = Normalized(np.array(img, dtype=np.float32), self.img_norm_cfg)
         mask = np.array(mask, dtype=np.float32)  / 255.0
         if len(mask.shape) > 2:
@@ -94,7 +93,6 @@ class TestSetLoader(Dataset):
             mask = Image.open((self.dataset_dir + '/masks/' + idxname + '.bmp').replace('//', '/'))
         if mask.size != img.size:
             mask = mask.resize(img.size, Image.Resampling.NEAREST)
-        # print(self.dataset_dir + '/images/' + self.test_list[idx] + '.png')
         img = Normalized(np.array(img, dtype=np.float32), self.img_norm_cfg)
         mask = np.array(mask, dtype=np.float32) / 255.0
         if len(mask.shape) > 2:
@@ -122,10 +120,8 @@ class TestSetLoaderRe256(Dataset):
             self.test_list = f.read().splitlines()
         if img_norm_cfg == None:
             self.img_norm_cfg = get_img_norm_cfg(train_dataset_name, dataset_dir)
-            # print("img_norm_cfg", self.img_norm_cfg)
         else:
             self.img_norm_cfg = img_norm_cfg
-            # print("img_norm_cfg", self.img_norm_cfg) #{'mean': 111.97807312011719, 'std': 27.62665367126465}
 
 
     def _testval_sync_transform(self, img, mask):
@@ -133,9 +129,8 @@ class TestSetLoaderRe256(Dataset):
         img = img.resize((base_size, base_size), Image.BICUBIC)
         mask = mask.resize((base_size, base_size), Image.NEAREST)
 
-        # final transform
         img, mask = np.array(img), np.array(mask,
-                                            dtype=np.float32)  # img: <class 'mxnet.ndarray.ndarray.NDArray'> (512, 512, 3)
+                                            dtype=np.float32)
         return img, mask
     def __getitem__(self, idx):
         try:
@@ -146,7 +141,6 @@ class TestSetLoaderRe256(Dataset):
             img = Image.open((self.dataset_dir + '/images/' + self.test_list[idx] + '.bmp').replace('//', '/')).convert(
                 'I')
             mask = Image.open((self.dataset_dir + '/masks/' + self.test_list[idx] + '.bmp').replace('//', '/'))
-        # print(self.dataset_dir + '/images/' + self.test_list[idx] + '.png')
         img, mask = self._testval_sync_transform(img, mask)
         img = Normalized(np.array(img, dtype=np.float32), self.img_norm_cfg)
         mask = np.array(mask, dtype=np.float32) / 255.0
@@ -243,12 +237,9 @@ class augumentation(object):
         yy = np.linspace(-1.0, 1.0, height, dtype=np.float32)[:, None]
         xx = np.linspace(-1.0, 1.0, width, dtype=np.float32)[None, :]
         if random.random() < 0.6:
-            # Smooth sensor/atmospheric illumination drift.
             output = output + random.uniform(-0.25, 0.25) * xx
             output = output + random.uniform(-0.25, 0.25) * yy
         if random.random() < 0.35:
-            # A broad cloud/illumination lobe; its scale is intentionally much
-            # larger than a target and therefore does not synthesize labels.
             center_x = random.uniform(-1.0, 1.0)
             center_y = random.uniform(-1.0, 1.0)
             sigma = random.uniform(0.35, 0.85)

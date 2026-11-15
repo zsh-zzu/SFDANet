@@ -19,27 +19,18 @@ den = [0.5]
 def carafe(x, normed_mask, kernel_size, group=1, up=1):
     b, c, h, w = x.shape
     _, m_c, m_h, m_w = normed_mask.shape
-    # assert m_c == kernel_size ** 2 * up ** 2
     assert m_h == up * h
     assert m_w == up * w
     pad = kernel_size // 2
     pad_x = F.pad(x, pad=[pad] * 4, mode='reflect')
     unfold_x = F.unfold(pad_x, kernel_size=(kernel_size, kernel_size), stride=1,
-                        padding=0)  # F.unfold 是用于从输入特征图中提取滑动窗口（局部区域）的函数
-    # unfold_x = unfold_x.reshape(b, c, 1, kernel_size, kernel_size, h, w).repeat(1, 1, up ** 2, 1, 1, 1, 1)
+                        padding=0)
     unfold_x = unfold_x.reshape(b, c * kernel_size * kernel_size, h, w)
     unfold_x = F.interpolate(unfold_x, scale_factor=up, mode='nearest')
-    # normed_mask = normed_mask.reshape(b, 1, up ** 2, kernel_size, kernel_size, h, w)
     unfold_x = unfold_x.reshape(b, c, kernel_size * kernel_size, m_h, m_w)
     normed_mask = normed_mask.reshape(b, 1, kernel_size * kernel_size, m_h, m_w)
     res = unfold_x * normed_mask
-    # test
-    # res[:, :, 0] = 1
-    # res[:, :, 1] = 2
-    # res[:, :, 2] = 3
-    # res[:, :, 3] = 4
     res = res.sum(dim=2).reshape(b, c, m_h, m_w)
-    # res = F.pixel_shuffle(res, up)
     return res
 
 
@@ -105,7 +96,6 @@ def wavelet_transform(x, filters):
 def inverse_wavelet_transform(x, filters):
     b, c, _, _ = x.shape
     pad = (filters.shape[2] // 2 - 1, filters.shape[3] // 2 - 1)
-    # x = x.reshape(b, c * 4, h_half, w_half)
     x = F.conv_transpose2d(x, filters, stride=2, groups=c // 4, padding=pad)
     return x
 
@@ -158,17 +148,13 @@ class SpatialAttention(nn.Module):
 class CrsSpaAttn(nn.Module):
     def __init__(self, channel_num=[16, 32, 64, 128], patchSize=[32, 16, 8, 4], layer_num=1, size=256):
         super().__init__()
-        patchSize = [size // 8, size // 16, size // 32, size // 64]  # patch32(256), 64(512)
-        overlap = [p // 2 for p in patchSize]  # p/2
+        patchSize = [size // 8, size // 16, size // 32, size // 64]
+        overlap = [p // 2 for p in patchSize]
         self.embeddings_1 = AvgMax_Embeddings()
         self.embeddings_2 = AvgMax_Embeddings()
         self.embeddings_3 = AvgMax_Embeddings()
         self.embeddings_4 = AvgMax_Embeddings()
 
-        # self.embeddings_1 = Channel_Embeddings(patchSize[0], in_channels=channel_num[0], overlap=overlap[0])
-        # self.embeddings_2 = Channel_Embeddings(patchSize[1], in_channels=channel_num[1], overlap=overlap[1])
-        # self.embeddings_3 = Channel_Embeddings(patchSize[2], in_channels=channel_num[2], overlap=overlap[2])
-        # self.embeddings_4 = Channel_Embeddings(patchSize[3], in_channels=channel_num[3], overlap=overlap[3])
 
         self.layer = nn.ModuleList()
         for _ in range(layer_num):
@@ -181,25 +167,10 @@ class CrsSpaAttn(nn.Module):
         self.reconstruct_4 = Reconstruct(channel_num[3], channel_num[3], kernel_size=1)
 
     def forward(self, en1, en2, en3, en4):
-        # emb1 = self.embeddings_1(en1)
-        # emb2 = self.embeddings_2(en2)
-        # emb3 = self.embeddings_3(en3)
-        # emb4 = self.embeddings_4(en4)
 
         for layer_block in self.layer:
             en1, en2, en3, en4 = layer_block(en1, en2, en3, en4)
 
-        # org_size = [(en1.shape[2], en1.shape[3]), (en2.shape[2], en2.shape[3]), (en3.shape[2], en3.shape[3]),
-        #             (en4.shape[2], en4.shape[3])]
-        # emb1 = self.reconstruct_1(emb1, size=org_size[0]) if emb1 is not None else None
-        # emb2 = self.reconstruct_2(emb2, size=org_size[1]) if emb2 is not None else None
-        # emb3 = self.reconstruct_3(emb3, size=org_size[2]) if emb3 is not None else None
-        # emb4 = self.reconstruct_4(emb4, size=org_size[3]) if emb4 is not None else None
-        #
-        # out1 = emb1 + en1 if en1 is not None else None
-        # out2 = emb2 + en2 if en2 is not None else None
-        # out3 = emb3 + en3 if en3 is not None else None
-        # out4 = emb4 + en4 if en4 is not None else None
 
         return en1, en2, en3, en4
 
@@ -207,7 +178,7 @@ class CrsSpaAttn(nn.Module):
 class MLA_Block(nn.Module):
     def __init__(self, channel_num=[16, 32, 64, 128], mode='kernel'):
         super().__init__()
-        self.msa = MSA(channel_num)  # sep or sep_gate or same_conv # 修改这里
+        self.msa = MSA(channel_num)
         self.mca = MCA(channel_num, mode=mode)
         self.CrsSpaAttnBlock = CrsSpaAttnBlock(channel_num, mode=mode)
         self.mca_norm1 = LayerNorm3d(channel_num[0], LayerNorm_type='WithBias')
@@ -216,17 +187,13 @@ class MLA_Block(nn.Module):
         self.mca_norm4 = LayerNorm3d(channel_num[3], LayerNorm_type='WithBias')
 
         size = 128
-        patchSize = [size // 8, size // 16, size // 32, size // 64]  # patch32(256), 64(512)
+        patchSize = [size // 8, size // 16, size // 32, size // 64]
         overlap = [0,0,0,0]
         self.embeddings_1 = Channel_Embeddings(patchSize[0], in_channels=channel_num[0], overlap=overlap[0])
         self.embeddings_2 = Channel_Embeddings(patchSize[1], in_channels=channel_num[1], overlap=overlap[1])
         self.embeddings_3 = Channel_Embeddings(patchSize[2], in_channels=channel_num[2], overlap=overlap[2])
         self.embeddings_4 = Channel_Embeddings(patchSize[3], in_channels=channel_num[3], overlap=overlap[3])
 
-        # self.embeddings_1 = AvgMax_Embeddings()
-        # self.embeddings_2 = AvgMax_Embeddings()
-        # self.embeddings_3 = AvgMax_Embeddings()
-        # self.embeddings_4 = AvgMax_Embeddings()
 
         self.proj1 = nn.Linear(channel_num[0], channel_num[0])
         self.proj2 = nn.Linear(channel_num[1], channel_num[1])
@@ -243,13 +210,7 @@ class MLA_Block(nn.Module):
         emb2 = self.embeddings_2(en2)
         emb3 = self.embeddings_3(en3)
         emb4 = self.embeddings_4(en4)
-        # res1, res2, res3, res4 = emb1, emb2, emb3, emb4
         sa1, sa2, sa3, sa4 = self.CrsSpaAttnBlock(emb1, emb2, emb3, emb4)
-        # ca1, ca2, ca3, ca4 = self.mca(emb1, emb2, emb3, emb4)
-        # ca1 = ca1 + res1
-        # ca2 = ca2 + res2
-        # ca3 = ca3 + res3
-        # ca4 = ca4 + res4
         b,c1,h,w = sa1.shape
         b,c2,_,_ = sa2.shape
         b,c3,_,_ = sa3.shape
@@ -262,28 +223,14 @@ class MLA_Block(nn.Module):
         org_size = [(en1.shape[2], en1.shape[3]), (en2.shape[2], en2.shape[3]), (en3.shape[2], en3.shape[3]),
                     (en4.shape[2], en4.shape[3])]
 
-        # sa1 = F.interpolate(sa1, size=org_size[0], mode='bilinear', align_corners=False)
-        # sa2 = F.interpolate(sa2, size=org_size[1], mode='bilinear', align_corners=False)
-        # sa3 = F.interpolate(sa3, size=org_size[2], mode='bilinear', align_corners=False)
-        # sa4 = F.interpolate(sa4, size=org_size[3], mode='bilinear', align_corners=False)
 
 
-        # org_size = [(en1.shape[2], en1.shape[3]), (en2.shape[2], en2.shape[3]), (en3.shape[2], en3.shape[3]),
-        #             (en4.shape[2], en4.shape[3])]
-        #
         sa1 = self.reconstruct_1(sa1, size=org_size[0])
         sa2 = self.reconstruct_2(sa2, size=org_size[1])
         sa3 = self.reconstruct_3(sa3, size=org_size[2])
         sa4 = self.reconstruct_4(sa4, size=org_size[3])
 
-        # ca1 = self.mca_norm1(ca1) if ca1 is not None else None
-        # ca2 = self.mca_norm2(ca2) if ca2 is not None else None
-        # ca3 = self.mca_norm3(ca3) if ca3 is not None else None
-        # ca4 = self.mca_norm4(ca4) if ca4 is not None else None
 
-        # return ca1, ca2, ca3, ca4
-        # sa1, sa2, sa3, sa4 = self.mca(ca1, ca2, ca3, ca4)
-        # sa1, sa2, sa3, sa4, sa_weight = self.msa(ca1, ca2, ca3, ca4)
 
         sa1 = sa1 + en1
         sa2 = sa2 + en2
@@ -320,25 +267,19 @@ class Reconstruct(nn.Module):
 class Channel_Embeddings(nn.Module):
     def __init__(self, patchsize, in_channels, overlap):
         super().__init__()
-        # patch_size = _pair(patchsize)
-        # n_patches = (img_size[0] // patch_size[0]) * (img_size[1] // patch_size[1])  # 14 * 14 = 196
 
         self.patch_embeddings = nn.Conv2d(in_channels=in_channels, out_channels=in_channels, kernel_size=patchsize,
                                           stride=patchsize - overlap)
-        # self.position_embeddings = nn.Parameter(torch.zeros(1, n_patches, in_channels))
-        # self.dropout = nn.Dropout(config.transformer["embeddings_dropout_rate"])
 
     def forward(self, x):
         if x is None:
             return None
-        x = self.patch_embeddings(x)  # b, c, 31, 31
+        x = self.patch_embeddings(x)
         return x
 
 class AvgMax_Embeddings(nn.Module):
     def __init__(self):
         super().__init__()
-        # self.patch_embeddings = nn.Conv2d(in_channels=in_channels, out_channels=in_channels, kernel_size=patchsize,
-        #                                   stride=patchsize - overlap)
 
     def forward(self, x):
         avg = F.adaptive_avg_pool2d(x, (16, 16))
@@ -347,13 +288,13 @@ class AvgMax_Embeddings(nn.Module):
 
 
 class MSA(nn.Module):
-    def __init__(self, channel_num=[16, 32, 64, 128]):  # sum[16, 32, 64, 128, 256]
+    def __init__(self, channel_num=[16, 32, 64, 128]):
         super().__init__()
-        self.channel_size = channel_num[0] + channel_num[1] + channel_num[2] + channel_num[3]  # 240
+        self.channel_size = channel_num[0] + channel_num[1] + channel_num[2] + channel_num[3]
         self.conv_emb = nn.Conv2d(self.channel_size, self.channel_size // 8, 1, 1, padding='same')
         self.emb_norm = nn.BatchNorm2d(self.channel_size // 8)
         self.Conv_1 = nn.Sequential(
-            nn.Conv2d(channel_num[3], channel_num[3] // 8, 1, 1, padding='same'),  # channel_num[3] // 8
+            nn.Conv2d(channel_num[3], channel_num[3] // 8, 1, 1, padding='same'),
             nn.BatchNorm2d(channel_num[3] // 8),
             nn.ReLU()
         )
@@ -375,7 +316,7 @@ class MSA(nn.Module):
             nn.BatchNorm2d(channel_num[0] // 8),
             nn.ReLU()
         )
-        self.se = SE_Block(self.channel_size // 8 * 2, ratio=10)  # 5, 10
+        self.se = SE_Block(self.channel_size // 8 * 2, ratio=10)
         self.final_Conv = nn.Conv2d(self.channel_size // 8 * 2, 1, 1, 1, padding='same')
 
         self.sig = nn.Sigmoid()
@@ -457,7 +398,7 @@ class MCA(nn.Module):
         if sigma is None:
             sigma = torch.std(diff, dim=2).unsqueeze(-1)
         distance = torch.norm(diff, p=2, dim=2).unsqueeze(-1)
-        similarity = torch.exp(-distance ** 2 / (2 * sigma ** 2))  # GUSSIAN KERNEL
+        similarity = torch.exp(-distance ** 2 / (2 * sigma ** 2))
 
         return similarity
 
@@ -563,7 +504,7 @@ def drop_path(x, drop_prob: float = 0., training: bool = False, scale_by_keep: b
     if drop_prob == 0. or not training:
         return x
     keep_prob = 1 - drop_prob
-    shape = (x.shape[0],) + (1,) * (x.ndim - 1)  # work with diff dim tensors, not just 2D ConvNets
+    shape = (x.shape[0],) + (1,) * (x.ndim - 1)
     random_tensor = x.new_empty(shape).bernoulli_(keep_prob)
     if keep_prob > 0.0 and scale_by_keep:
         random_tensor.div_(keep_prob)
@@ -668,10 +609,6 @@ class CrsSpaAttnBlock(nn.Module):
         self.ffn4 = IRB(in_features=channel_num[3], hidden_features=int(channel_num[3] * mlp_ratio), act_layer=nn.GELU, drop=drop, ksize=3,
                        extra_act=extra_act)
 
-        # self.ffn1 = FeedForward(channel_num[0], ffn_expansion_factor=2.66, bias=False)
-        # self.ffn2 = FeedForward(channel_num[1], ffn_expansion_factor=2.66, bias=False)
-        # self.ffn3 = FeedForward(channel_num[2], ffn_expansion_factor=2.66, bias=False)
-        # self.ffn4 = FeedForward(channel_num[3], ffn_expansion_factor=2.66, bias=False)
 
         q_pooled_sizes = [16, 16, 16, 16]
         base_pooled_sizes = [11, 8, 6, 4]
@@ -771,7 +708,6 @@ class CrsSpaAttnBlock(nn.Module):
             emb_all_gv4 = rearrange(emb_all_gv4, 'b c h w -> b c (h w)', h=h, w=w)
             emb4_gq, emb_all_gk4 = (F.normalize(emb4_gq, dim=-1), F.normalize(emb_all_gk4, dim=-1))
 
-            # Conduct Pyramid Pooling on K, V
             pools1 = []
             pools2 = []
             pools3 = []
@@ -837,10 +773,9 @@ class CrsSpaAttnBlock(nn.Module):
             kv4 = self.kv4(pools4).reshape(b, -1, 2, self.num_heads, c4 // self.num_heads).permute(2, 0, 3, 1, 4)
             k4, v4 = kv4[0], kv4[1]
 
-            # self-attention
             attn1 = (emb1_gq_res @ k1.transpose(-2, -1)) * self.scale1
             attn1 = attn1.softmax(dim=-1)
-            out1 = (attn1 @ v1)  # B N C
+            out1 = (attn1 @ v1)
             out1 = out1.transpose(-1, -2).flatten(1, 2)
 
             attn2 = (emb2_gq_res @ k2.transpose(-2, -1)) * self.scale2
@@ -857,19 +792,7 @@ class CrsSpaAttnBlock(nn.Module):
             attn4 = attn4.softmax(dim=-1)
             out4 = (attn4 @ v4)
             out4 = out4.transpose(-1, -2).flatten(1, 2)
-            ##################################################################
 
-            # sim1 = self.kernel_similarity(emb1_gq, emb_all_gk1)
-            # sim2 = self.kernel_similarity(emb2_gq, emb_all_gk2)
-            # sim3 = self.kernel_similarity(emb3_gq, emb_all_gk3)
-            # sim4 = self.kernel_similarity(emb4_gq, emb_all_gk4)
-            #
-            # sim1, sim2, sim3, sim4 = self.softmax(sim1), self.softmax(sim2), self.softmax(sim3), self.softmax(sim4)
-            #
-            # out1 = sim1 * emb_all_gv1
-            # out2 = sim2 * emb_all_gv2
-            # out3 = sim3 * emb_all_gv3
-            # out4 = sim4 * emb_all_gv4
 
             out1 = rearrange(out1, 'b c (h w) -> b c h w', h=h, w=w)
             out2 = rearrange(out2, 'b c (h w) -> b c h w', h=h, w=w)
@@ -881,10 +804,6 @@ class CrsSpaAttnBlock(nn.Module):
             att_out3 = self.drop_path3(out3)
             att_out4 = self.drop_path4(out4)
 
-            # att_out1 = self.out_Conv1(out1)
-            # att_out2 = self.out_Conv2(out2)
-            # att_out3 = self.out_Conv3(out3)
-            # att_out4 = self.out_Conv4(out4)
 
             att_out1 = att_out1 + emb1
             att_out2 = att_out2 + emb2
@@ -936,9 +855,9 @@ class SE_Block(nn.Module):
         super().__init__()
         self.gap = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Sequential(
-            nn.Linear(inchannel, inchannel // ratio, bias=False),  # c -> c/r
+            nn.Linear(inchannel, inchannel // ratio, bias=False),
             nn.ReLU(),
-            nn.Linear(inchannel // ratio, inchannel, bias=False),  # c/r -> c
+            nn.Linear(inchannel // ratio, inchannel, bias=False),
             nn.Sigmoid()
         )
 
@@ -1045,8 +964,6 @@ class CAHighPassDWT(nn.Module):
         super().__init__()
         self.Mratio = Mratio
         self.atten_factor = atten_factor
-        # --- 1. DCT 分支的组件 ---
-        # 专门处理高频DCT信号的 MLP
         self.dct_mlp = nn.Sequential(
             nn.Flatten(),
             nn.Linear(in_planes * 2, in_planes // ratio * 2),
@@ -1054,43 +971,34 @@ class CAHighPassDWT(nn.Module):
             nn.Linear(in_planes // ratio * 2, in_planes)
         )
 
-        # --- 2. DWT 分支的组件 ---
         self.wavelet = DWTForward(J=1, wave='haar', mode='symmetric')
 
-        # 融合 LL 和 3个高频带 (LH, HL, HH)
-        # 输入维度是 in_planes * 2 (LL占in_planes, H占in_planes)
         self.dwt_fusion_conv = nn.Sequential(
             nn.Conv2d(in_planes * 2, in_planes, 1),
             nn.BatchNorm2d(in_planes),
             nn.ReLU()
         )
 
-        # 专门处理DWT信号的 MLP
         self.ll_mlp = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(in_planes, in_planes // ratio),  # 输入是 C
+            nn.Linear(in_planes, in_planes // ratio),
             nn.ReLU(),
-            nn.Linear(in_planes // ratio, in_planes)  # 输出是 C
+            nn.Linear(in_planes // ratio, in_planes)
         )
         self.high_mlp = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(in_planes, in_planes // ratio),  # 输入是 C
+            nn.Linear(in_planes, in_planes // ratio),
             nn.ReLU(),
-            nn.Linear(in_planes // ratio, in_planes)  # 输出是 C
+            nn.Linear(in_planes // ratio, in_planes)
         )
 
-        # --- 3. 通用组件 ---
         self.global_max_pool = nn.AdaptiveMaxPool2d(1)
         self.global_avg_pool = nn.AdaptiveAvgPool2d(1)
 
-        # 最终融合权重的激活
-        # 注意：这里我不加Sigmoid，因为两个分支已经分别Sigmoid了，最后是一个加权过程
         self.channel_fusion = nn.Conv1d(2, 1, kernel_size=1, bias=False)
 
         self.norm_ll = nn.BatchNorm2d(in_planes)
         self.norm_high = nn.BatchNorm2d(in_planes)
-        # self.norm_ll = nn.InstanceNorm2d(in_planes, affine=True)
-        # self.norm_high = nn.InstanceNorm2d(in_planes, affine=True)  # 或者不用affine
 
         self.gamma_dct = nn.Parameter(torch.full((1,), 0.5))
         self.gamma_dwt = nn.Parameter(torch.full((1,), 0.5))
@@ -1106,26 +1014,15 @@ class CAHighPassDWT(nn.Module):
     def forward(self, x):
         b, c, h, w = x.size()
 
-        # ==========================================
-        # Branch 1: DCT (Global High Frequency)
-        # ==========================================
         if self.Mratio is not None:
-            # 1. 转频域
             dct_x = dct_2d(x, norm="ortho")
 
-            # 2. 高通滤波 (Masking)
             mask = self._compute_dct_weight(h, w, self.Mratio).to(x.device)
             mask = mask.view(1, 1, h, w)
             m_dct_x = dct_x * mask
 
-            # 3. 转回空域 (此时 idct_x 近似为残差图/边缘图)
             idct_x = idct_2d(m_dct_x, norm='ortho')
-            # --- 关键改动：高频信号池化策略 ---
-            # 策略A: MaxPool (捕捉最强异常点，如高亮小目标)
 
-            # 策略B: StdPool (标准差池化，捕捉通道的能量/纹理丰富度)
-            # 解释：高通图均值约为0，计算Std比Avg更能代表该通道是否包含大量高频信息
-            # 计算公式：std = sqrt(mean((x - mean)^2))
             dct_std = torch.std(idct_x.reshape(b, c, -1), dim=2).reshape(b, c, 1, 1)
             dct_max = self.global_max_pool(idct_x.abs())
         else:
@@ -1133,41 +1030,23 @@ class CAHighPassDWT(nn.Module):
             dct_std = self.global_avg_pool(idct_x)
             dct_max = self.global_max_pool(idct_x)
 
-        # 融合两种池化 (相加)
         dct_desc = torch.cat((dct_max, dct_std), dim=1)
-        # dct_desc = dct_max + dct_std #后续改成cat
 
-        # 计算 DCT 注意力向量
         dct_att = self.dct_mlp(dct_desc).view(b, c, 1, 1)
 
-        # ==========================================
-        # Branch 2: DWT (Local High Frequency)
-        # ==========================================
-        # 1. 小波变换
         ll, H = self.wavelet(x)
-        # ll shape: [B, C, H/2, W/2]
-        # H[0] shape: [B, C, 3, H/2, W/2]
 
-        # 2. 提取高频并取绝对值 (关键！)
-        # 我们关注的是“有没有边缘”，而不是边缘是黑白还是白黑
         lh = torch.abs(H[0][:, :, 0, :, :])
         hl = torch.abs(H[0][:, :, 1, :, :])
         hh = torch.abs(H[0][:, :, 2, :, :])
 
-        # 3. 合并高频分量 (这里用Max，表示取三个方向中最强的边缘)
         high_freq_combined = torch.max(torch.stack([lh, hl, hh], dim=0), dim=0)[0]
 
-        # --- 关键修改：先归一化，再 Cat ---
         ll = self.norm_ll(ll)
         high = self.norm_high(high_freq_combined)
 
-        # 4. 与 LL 低频分量拼接
-        # dwt_input = torch.cat([ll_norm, high_norm], dim=1)  # [B, 2C, H/2, W/2]
 
-        # 5. 卷积融合特征
-        # dwt_feat = self.dwt_fusion_conv(dwt_input)  # [B, C, H/2, W/2]
 
-        # 6. DWT 分支池化 (LL包含背景，所以AvgPool在这里是有效的)
         ll_desc = self.global_avg_pool(ll) + self.global_max_pool(ll)
         high_desc = self.global_avg_pool(high) + self.global_max_pool(high)
 
@@ -1175,27 +1054,12 @@ class CAHighPassDWT(nn.Module):
         high_logits = self.high_mlp(high_desc).view(b, c, 1, 1)
         dwt_att = ll_logits + high_logits
 
-        # ==========================================
-        # Final Fusion
-        # ==========================================
-        # 此时我们有两个注意力向量：
-        # dct_att: [B, C, 1, 1] (0~1之间)
-        # dwt_att: [B, C, 1, 1] (0~1之间)
 
-        # 简单相乘通常会导致数值过小，这里建议使用“最大化”或“加权和”
-        # 方案：直接相加后截断，或者取Max
-        # 这里使用加和，表示只要在一个频域被认为是重要的，它就是重要的
         logits = self.gamma_dct * dct_att + self.gamma_dwt * dwt_att
         logits = torch.tanh(logits)
         final_att = torch.sigmoid(logits)
 
-        # 如果你想让网络自己学习怎么融合这两个域，可以用下面这行代替上面那行：
-        # stacked = torch.stack([dct_att, dwt_att], dim=1).squeeze(-1).squeeze(-1) # [B, 2, C]
-        # final_att = self.channel_fusion(stacked).view(b, c, 1, 1).sigmoid()
 
-        # ==========================================
-        # !!! 必须乘回原图 !!!
-        # ==========================================
         return final_att
 
 
@@ -1203,29 +1067,27 @@ class DyHighPassAttn(BaseModule):
     def __init__(self,
                  in_channels=16,
                  isdct=True,
-                 highpass_kernel=3,  # 高通滤波器 kernel 大小
-                 up_group=1,  # carafe 分组数
-                 compressed_channels=64,  # 通道压缩维度
-                 encoder_kernel=3,  # 掩码生成器卷积核大小
+                 highpass_kernel=3,
+                 up_group=1,
+                 compressed_channels=64,
+                 encoder_kernel=3,
                  init_cfg=dict(
                      type='Xavier', layer='Conv2d', distribution='uniform')):
         super().__init__(init_cfg)
-        self.isdct = isdct  # true when in p1&p2; false when in p3&p4
+        self.isdct = isdct
         self.highpass_kernel = highpass_kernel
         self.up_group = up_group
         self.compressed_channels = compressed_channels
 
-        # 通道压缩器：将输入通道压缩到指定维度
         self.hr_channel_compressor = nn.Conv2d(in_channels, compressed_channels, 1)
 
         self.huifuConv = nn.Conv2d(self.compressed_channels, in_channels, kernel_size=1)
 
-        # 动态掩码生成器（AHPF 生成器）：生成 carafe 需要的掩码
         self.content_encoder2 = nn.Conv2d(
             compressed_channels,
-            highpass_kernel ** 2 * up_group * 1 * 1,  # 1x1 上采样（保持尺寸）
+            highpass_kernel ** 2 * up_group * 1 * 1,
             encoder_kernel,
-            padding=int((encoder_kernel - 1) / 2),  # 保持尺寸
+            padding=int((encoder_kernel - 1) / 2),
             groups=1
         )
 
@@ -1234,11 +1096,9 @@ class DyHighPassAttn(BaseModule):
                 *[ConvModule(in_channels, 1, kernel_size=1, bias=False)]
             )
 
-        # 初始化权重
         self.init_weights()
 
     def init_weights(self):
-        # 初始化卷积层权重
         if hasattr(self, 'content_encoder2'):
             nn.init.xavier_normal_(self.content_encoder2.weight, gain=1.0)
             if self.content_encoder2.bias is not None:
@@ -1252,16 +1112,12 @@ class DyHighPassAttn(BaseModule):
         if scale_factor is not None:
             mask = F.pixel_shuffle(mask, self.scale_factor)
         n, mask_c, h, w = mask.size()
-        mask_channel = int(mask_c / float(kernel ** 2))  # group
-        # mask = mask.view(n, mask_channel, -1, h, w)
-        # mask = F.softmax(mask, dim=2, dtype=mask.dtype)
-        # mask = mask.view(n, mask_c, h, w).contiguous()
+        mask_channel = int(mask_c / float(kernel ** 2))
 
         mask = mask.view(n, mask_channel, -1, h, w)
         mask = F.softmax(mask, dim=2, dtype=mask.dtype)
         mask = mask.view(n, mask_channel, kernel, kernel, h, w)
         mask = mask.permute(0, 1, 4, 5, 2, 3).view(n, -1, kernel, kernel)
-        # mask = F.pad(mask, pad=[padding] * 4, mode=self.padding_mode) # kernel + 2 * padding
         mask = mask * hamming
         mask /= mask.sum(dim=(-1, -2), keepdims=True)
         mask = mask.view(n, mask_channel, h, w, -1)
@@ -1271,26 +1127,20 @@ class DyHighPassAttn(BaseModule):
     def forward(self, x):
         _, _, h0, w0 = x.size()
         if not self.isdct:
-            # 非 DCT 模式保持不变
             return x * torch.sigmoid(self.spatial1x1(x))
 
-        # 高通滤波替换为 carafe 实现
-        # 1. 压缩通道维度
         compressed_hr_feat = self.hr_channel_compressor(x)
-        # 2. 生成高通掩码（AHPF）
         mask_hr_hr_feat = self.content_encoder2(compressed_hr_feat)
-        # 3. 掩码归一化
         mask_hr_init = self.kernel_normalizer(
             mask_hr_hr_feat,
             self.highpass_kernel
         )
-        # 4. 计算高通特征：原始特征 - 低通特征（carafe 生成低通）
         highpass_feat = compressed_hr_feat - carafe(
             compressed_hr_feat,
             mask_hr_init,
             self.highpass_kernel,
             self.up_group,
-            1  # 保持尺寸不变（scale=1）
+            1
         )
         return self.sa(highpass_feat)
 
@@ -1309,9 +1159,7 @@ class Res_CBAM_block_wConv(nn.Module):
         else:
             self.shortcut = None
 
-        # self.ca = CAHighPassDWT(out_channels, Mratio=mratio, atten_factor=atten_factor)
         self.ca = ChannelAttention(out_channels)
-        # self.sa = DyHighPassAttn(out_channels,isdct=isdct)
         self.sa = SpatialAttention()
 
     def forward(self, x):
@@ -1345,9 +1193,7 @@ class Res_CBAM_block_hpf_cahpdwt(nn.Module):
             self.shortcut = None
 
         self.ca = CAHighPassDWT(out_channels, Mratio=mratio, atten_factor=atten_factor)
-        # self.ca = ChannelAttention(out_channels)
         self.sa = DyHighPassAttn(out_channels,isdct=isdct)
-        # self.sa = SpatialAttention()
 
     def forward(self, x):
         residual = x
@@ -1379,9 +1225,7 @@ class Res_CBAM_block_hpf(nn.Module):
         else:
             self.shortcut = None
 
-        # self.ca = CAHighPassDWT(out_channels, Mratio=mratio, atten_factor=atten_factor)
         self.ca = ChannelAttention(out_channels)
-        # self.sa = DyHighPassAttn(out_channels,isdct=isdct)
         self.sa = SpatialAttention()
 
     def forward(self, x):
@@ -1404,33 +1248,27 @@ class CrsSpaAttnWithHighFreqBypass(nn.Module):
 
         def __init__(self, channel_num=[24, 48, 96, 192], patchSize=[32, 16, 8, 4], layer_num=2, size=256):
             super().__init__()
-            # 原始 CrsSpaAttn
             self.original_crsspa = CrsSpaAttn(channel_num, patchSize, layer_num, size)
 
-            # 高频旁路 - 保护小目标高频信息
             self.hf_bypass = nn.ModuleList([
                 nn.Sequential(
-                    nn.Conv2d(c, c, 3, padding=1, groups=c),  # 深度可分离卷积
+                    nn.Conv2d(c, c, 3, padding=1, groups=c),
                     nn.Conv2d(c, c, 1),
                     nn.BatchNorm2d(c),
                     nn.Sigmoid()
                 ) for c in channel_num
             ])
 
-            # 自适应融合权重
-            self.fusion_weights = nn.Parameter(torch.tensor([0.7, 0.3]))  # [原始权重, 高频权重]
+            self.fusion_weights = nn.Parameter(torch.tensor([0.7, 0.3]))
 
         def forward(self, en1, en2, en3, en4):
-            # 原始处理
             out1, out2, out3, out4 = self.original_crsspa(en1, en2, en3, en4)
 
-            # 高频旁路
             hf1 = self.hf_bypass[0](en1)
             hf2 = self.hf_bypass[1](en2)
             hf3 = self.hf_bypass[2](en3)
             hf4 = self.hf_bypass[3](en4)
 
-            # 加权融合
             w = torch.softmax(self.fusion_weights, dim=0)
             out1 = w[0] * out1 + w[1] * (en1 * hf1)
             out2 = w[0] * out2 + w[1] * (en2 * hf2)
@@ -1442,7 +1280,7 @@ class CrsSpaAttnWithHighFreqBypass(nn.Module):
 class SFDANet(nn.Module):
     def __init__(self, input_channels, block=ResNet, size=256):
         super().__init__()
-        param_channels = [24, 48, 96, 192]  # down3
+        param_channels = [24, 48, 96, 192]
         param_blocks = [2, 2, 2, 2]
         size = size
         self.pool1 = nn.Sequential(nn.MaxPool2d(kernel_size=2, stride=2),
@@ -1459,10 +1297,10 @@ class SFDANet(nn.Module):
         self.conv_init = nn.Conv2d(input_channels, param_channels[0], 1, 1)
 
         self.stage_configs = [
-            {'mratio': (0.125, 0.125), 'atten': 0.2},  # Stage 0 - 更弱
-            {'mratio': (0.125, 0.125), 'atten': 0.4},  # Stage 1 - 更弱
-            {'mratio': (0.125, 0.125), 'atten': 0.6},  # Stage 2 - 略微增强
-            {'mratio': (0.125, 0.125), 'atten': 0.8},  # Stage 3 - 最强
+            {'mratio': (0.125, 0.125), 'atten': 0.2},
+            {'mratio': (0.125, 0.125), 'atten': 0.4},
+            {'mratio': (0.125, 0.125), 'atten': 0.6},
+            {'mratio': (0.125, 0.125), 'atten': 0.8},
         ]
 
         self.encoder_0 = self._make_layer(param_channels[0], param_channels[0], Res_CBAM_block_hpf_cahpdwt, param_blocks[0], config=self.stage_configs[0])
@@ -1472,9 +1310,6 @@ class SFDANet(nn.Module):
         self.encoder_3 = self._make_layer(param_channels[2] * 2, param_channels[3], Res_CBAM_block_hpf_cahpdwt,
                                           param_blocks[3], config=self.stage_configs[3])
 
-        # self.crsspa = CrsSpaAttn(
-        #     channel_num=[param_channels[0], param_channels[1], param_channels[2], param_channels[3]],
-        #     patchSize=[32, 16, 8, 4], layer_num=2, size=size)
 
         self.HighRidePath = CrsSpaAttnWithHighFreqBypass(
             channel_num=param_channels,
@@ -1514,7 +1349,6 @@ class SFDANet(nn.Module):
         x_e2 = self.encoder_2(self.pool2(x_e1))
         x_m = self.encoder_3(self.pool3(x_e2))
 
-        # x_e0, x_e1, x_e2, x_m = self.crsspa(x_e0, x_e1, x_e2, x_m)
 
         x_e0, x_e1, x_e2, x_m = self.HighRidePath(x_e0, x_e1, x_e2, x_m)
 
@@ -1538,42 +1372,27 @@ class SFDANet(nn.Module):
 
 
 if __name__ == "__main__":
-    # 设置参数
-    crop_size = 256  # 假设输入是 256x256
+    crop_size = 256
 
-    # 创建模型
     model = SFDANet(1)
 
-    # 将模型设置为评估模式（虽然对于thop计算不是强制的，但在逻辑上是严谨的）
     model.eval()
 
     print("=" * 50)
     print("正在计算模型参数量和 FLOPs...")
 
-    # --------------------------------------------------------
-    # 使用 thop 计算 Params 和 FLOPs
-    # --------------------------------------------------------
-    # 1. 创建一个用于测试计算量的 dummy input (通常使用 batch_size=1)
     input_test = torch.randn(4, 1, crop_size, crop_size)
 
-    # 2. 调用 profile
-    # 注意：inputs 是一个元组，对应 forward 函数的参数。
-    # 如果你的 forward(x, deep_supervision) 需要第二个参数，这里也需要传入。
-    # 这里我假设计算量时也传入 True，或者你可以根据推理阶段的需求传入 False
     flops, params = profile(model, inputs=(input_test, True), verbose=False)
 
-    # 3. 使用 clever_format 进行格式化 (例如将 1024000 转为 1.024M)
     flops_str, params_str = clever_format([flops, params], "%.3f")
 
     print(f"Params: {params_str}")
     print(f"FLOPs:  {flops_str}")
     print("=" * 50)
 
-    # --------------------------------------------------------
-    # 原有的输出形状测试代码
-    # --------------------------------------------------------
     test_shapes = [
-        (4, 1, crop_size, crop_size),  # batch=4
+        (4, 1, crop_size, crop_size),
     ]
 
     for shape in test_shapes:
@@ -1584,16 +1403,13 @@ if __name__ == "__main__":
         print(f"\n当前测试 Batch Shape: {shape}")
 
         if isinstance(output, list):
-            # 情况2: 只返回 masks 列表
             print(f"模型返回: masks列表")
             print(f"列表长度: {len(output)}")
             for i, mask in enumerate(output):
                 print(f"  mask{i}: {mask.shape}")
         elif isinstance(output, torch.Tensor):
-            # 情况3: 只返回单个张量
             print(f"模型返回: 单个张量")
             print(f"Output: {output.shape}")
         else:
-            # 其他情况
             print(f"未知输出类型: {type(output)}")
             print(f"输出内容: {output}")
