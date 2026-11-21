@@ -154,12 +154,12 @@ The three released checkpoints are included under `logs/`:
 @ARTICLE{11758620,
   author={Zhang, Shihao and He, Xin and Yuan, Shuai and Jin, Shaohui and Jiang, Xiaoheng and Lu, Yang and Xu, Mingliang},
   journal={IEEE Transactions on Geoscience and Remote Sensing}, 
-  title={SFDANet: A Spatial-Frequency Decoupled Attention Network for Infrared Small Target Detection}, 
+  title={SFDANet: A Spatial–Frequency Decoupled Attention Network for Infrared Small Target Detection}, 
   year={2026},
-  volume={},
+  volume={64},
   number={},
-  pages={1-1},
-  keywords={Object detection;Clutter;Modeling;Frequency;Art;Personal digital devices;Discrete cosine transforms;Pixel;Convolution;Attenuation;Gaussian prior convolution;spatial-frequency decoupling;spatial pyramid cross-attention;infrared small target detection (IRSTD)},
+  pages={5013614-5013614},
+  keywords={Object detection;Clutter;Modeling;Frequency;Art;Personal digital devices;Discrete cosine transforms;Pixel;Convolution;Attenuation;Gaussian prior convolution (GPC);infrared small target detection (IRSTD);spatial pyramid cross-attention (SPCA);spatial–frequency decoupling (SFD)},
   doi={10.1109/TGRS.2026.3748374}}
 ```
 
